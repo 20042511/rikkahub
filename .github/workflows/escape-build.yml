@@ -3,11 +3,50 @@ name: Escape Build (HostShellRunner)
 on:
   push:
     branches: [ "escape" ]
+  pull_request:
+    branches: [ "master" ]
   workflow_dispatch:
 
+env:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true"
+
+concurrency:
+  group: escape-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  validate:
+    name: Lint & Unit Tests
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Run workspace unit tests
+        run: |
+          chmod +x gradlew
+          ./gradlew :workspace:testDebugUnitTest --stacktrace
+
+      - name: Run app unit tests
+        run: ./gradlew :app:testDebugUnitTest --stacktrace
+        continue-on-error: true  # app 层测试依赖 Android 环境，允许跳过
+
+  build:
+    name: Build (${{ matrix.abi }})
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        abi: [arm64-v8a, x86_64]
+      fail-fast: false  # 一个 ABI 失败不影响另一个
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,6 +59,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      # --- Web UI 构建 ---
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -36,38 +76,61 @@ jobs:
         working-directory: web-ui
         run: pnpm install --frozen-lockfile
 
-      - name: Gradle cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+      # --- Gradle 加速 ---
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Generate debug keystore
         run: |
-          keytool -genkey -v -keystore ~/debug.keystore \
-            -alias androiddebugkey -keyalg RSA -keysize 2048 \
-            -validity 10000 \
-            -storepass android -keypass android \
-            -dname "CN=Android Debug,O=Android,C=US" 2>/dev/null || true
+          if [ ! -f ~/debug.keystore ]; then
+            keytool -genkey -v -keystore ~/debug.keystore \
+              -alias androiddebugkey -keyalg RSA -keysize 2048 \
+              -validity 10000 \
+              -storepass android -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
 
       - name: Configure debug signing
         run: |
-          cat > local.properties << 'EOF'
+          cat > local.properties << PROPEOF
           key.store=$(echo ~)/debug.keystore
           key.alias=androiddebugkey
           key.store.password=android
           key.key.password=android
-          EOF
+          PROPEOF
 
-      - name: Build Debug APK
+      - name: Build Debug APK (${{ matrix.abi }})
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug \
+            --build-cache \
+            --configuration-cache \
+            -Pandroid.injected.invoked.from.ide=false
 
-      - name: Upload APK artifact
+      - name: Upload APK (${{ matrix.abi }})
         uses: actions/upload-artifact@v4
         with:
-          name: rikkahub-escape-debug
+          name: rikkahub-escape-debug-${{ matrix.abi }}
           path: app/build/outputs/apk/debug/*.apk
+          retention-days: 30
+
+  # 聚合：把两个 ABI 的 APK 打包成一个 release
+  aggregate:
+    name: Aggregate Artifacts
+    needs: build
+    runs-on: ubuntu-latest
+    if: always() && github.event_name != 'pull_request'
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: rikkahub-escape-debug-*
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rikkahub-escape-debug-all
+          path: ./*
+          retention-days: 30
