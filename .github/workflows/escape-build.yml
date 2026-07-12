@@ -44,11 +44,6 @@ jobs:
             ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
 
-      - name: Create dummy google-services.json
-        run: |
-          mkdir -p app
-          echo '{}' > app/google-services.json
-
       - name: Generate debug keystore
         run: |
           keytool -genkey -v -keystore ~/debug.keystore \
