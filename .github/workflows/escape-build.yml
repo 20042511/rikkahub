@@ -133,4 +133,52 @@ jobs:
         with:
           name: rikkahub-escape-debug-all
           path: ./*
-          retention-days: 30
+          retention-days: 90
+
+  # 发布到 Releases 页（对所有人可见，无需登录即可下载）
+  release:
+    name: Publish Release
+    needs: [build, aggregate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: success() && github.event_name != 'pull_request'
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: rikkahub-escape-debug-*
+          merge-multiple: true
+          path: artifacts
+
+      - name: Rename APKs
+        run: |
+          for f in artifacts/*.apk; do
+            abi=$(echo "$f" | grep -oP '(arm64-v8a|x86_64)')
+            if [ -n "$abi" ]; then
+              mv "$f" "artifacts/rikkahub-escape-$abi-debug.apk"
+            fi
+          done
+          ls -lh artifacts/
+
+      - name: Create / update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: escape-${{ github.run_id }}
+          name: "Escape Build #${{ github.run_number }} (${{ github.sha }})"
+          body: |
+            ## RikkaHub Escape APK
+
+            | 字段 | 值 |
+            |:--|:--|
+            | Commit | `${{ github.sha }}` |
+            | Branch | `escape` |
+            | 构建时间 | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |
+            | Runner | HostShellRunner（绕过 proot phantom process killer） |
+
+            ### 下载
+            - [arm64-v8a APK](artifacts/rikkahub-escape-arm64-v8a-debug.apk) — 主流 Android 设备
+            - [x86_64 APK](artifacts/rikkahub-escape-x86_64-debug.apk) — 模拟器
+
+            > ⚠️ Debug 版本，安装前需开启「允许安装未知来源应用」。
+          files: artifacts/rikkahub-escape-*-debug.apk
+          make_latest: true
