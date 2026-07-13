@@ -89,6 +89,23 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Setup Node.js + pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          cache-dependency-path: web-ui/pnpm-lock.yaml
+
+      - name: Install web UI dependencies
+        run: |
+          cd web-ui
+          pnpm install --frozen-lockfile
+
       - name: Prepare google-services.json
         run: |
           cat > app/google-services.json << 'EOF'
