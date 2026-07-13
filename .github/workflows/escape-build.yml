@@ -169,8 +169,8 @@ jobs:
       - name: Create / update release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: escape-${{ github.run_id }}
-          name: "Escape Build #${{ github.run_number }} (${{ github.sha }})"
+          tag_name: escape-latest
+          name: "Escape Build #${{ github.run_number }}"
           body: |
             ## RikkaHub Escape APK
 
@@ -178,13 +178,10 @@ jobs:
             |:--|:--|
             | Commit | `${{ github.sha }}` |
             | Branch | `escape` |
-            | 构建时间 | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} |
             | Runner | HostShellRunner（绕过 proot phantom process killer） |
 
-            ### 下载
-            - [arm64-v8a APK](artifacts/rikkahub-escape-arm64-v8a-debug.apk) — 主流 Android 设备
-            - [x86_64 APK](artifacts/rikkahub-escape-x86_64-debug.apk) — 模拟器
+            **安装方式：** 下载对应你设备的 APK → 开启「允许安装未知来源应用」→ 安装
 
-            > ⚠️ Debug 版本，安装前需开启「允许安装未知来源应用」。
+            > ⚠️ Debug 版本，与官方版签名不同，**可共存安装**。
           files: release-apks/rikkahub-escape-*-debug.apk
           make_latest: true

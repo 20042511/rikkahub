@@ -20,9 +20,14 @@ Click to join our Discord server 👉 [【RikkaHub】](https://discord.gg/9weBqx
 
 ## 🚀 Download
 
-🔗 [Download from Website](https://rikka-ai.com/download) (Recommended)
+| 版本 | 下载 |
+|:--|:--|
+| **官方版** | [![Website](https://img.shields.io/badge/Download-rikka--ai.com-blue)](https://rikka-ai.com/download) · [![Google Play](https://img.shields.io/badge/Google_Play-414141?logo=googleplay)](https://play.google.com/store/apps/details?id=me.rerere.rikkahub) |
+| **Escape 版** 🏃 | [![Release](https://img.shields.io/github/v/release/20042511/rikkahub-escape?label=latest&color=orange)](https://github.com/20042511/rikkahub-escape/releases/tag/escape-latest) · [![Downloads](https://img.shields.io/github/downloads/20042511/rikkahub-escape/escape-latest/total?color=green)](https://github.com/20042511/rikkahub-escape/releases/tag/escape-latest) · [![Build](https://github.com/20042511/rikkahub-escape/actions/workflows/escape-build.yml/badge.svg?branch=escape)](https://github.com/20042511/rikkahub-escape/actions/workflows/escape-build.yml) |
 
-🔗 [Download from Google Play](https://play.google.com/store/apps/details?id=me.rerere.rikkahub)
+**Escape 版说明：** 基于官方版修改底层执行引擎（`ProotShellRunner` → `HostShellRunner`），绕过 Android 14 的 phantom process killer 限制。Workspace 内所有命令直接在宿主 shell 执行，与官方版可共存安装。
+
+[查看 Escape 版文档 →](https://github.com/20042511/rikkahub-escape/releases/tag/escape-latest)
 
 ## 💖 Sponsors
 
