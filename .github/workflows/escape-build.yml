@@ -150,20 +150,46 @@ jobs:
           merge-multiple: true
           path: artifacts
 
+      - name: List downloaded artifacts (debug)
+        run: |
+          echo "=== artifacts content ==="
+          find artifacts -type f -ls 2>/dev/null || echo "no files in artifacts/"
+          echo "=== current dir ==="
+          ls -la
+          echo "=== pwd ==="
+          pwd
+
       - name: Rename APKs
         run: |
+          set -e  # 任何错误立即退出
           mkdir -p release-apks
-          find artifacts -name '*.apk' | while read f; do
-            basename=$(basename "$f")
-            # 从路径和文件名中提取 ABI 标识
-            case "$basename" in
-              *arm64*v8a*|*aarch64*)   abi="arm64-v8a" ;;
-              *x86_64*|*amd64*)         abi="x86_64"    ;;
-              *)                        abi="universal" ;;
+          apk_count=0
+
+          # 查找所有 APK 文件（递归搜索 artifacts/ 目录）
+          while IFS= read -r f; do
+            abi="universal"
+            fname=$(basename "$f")
+
+            # 从文件名中提取 ABI
+            case "$fname" in
+              *arm64*|*v8a*|*aarch64*)   abi="arm64-v8a" ;;
+              *x86_64*|*amd64*)           abi="x86_64"    ;;
+              *universal*)               abi="universal" ;;
             esac
-            cp "$f" "release-apks/rikkahub-escape-$abi-debug.apk"
-            echo "  → rikkahub-escape-$abi-debug.apk ($(du -h "$f" | cut -f1))"
-          done
+
+            target="release-apks/rikkahub-escape-${abi}-debug.apk"
+            cp -v "$f" "$target"
+            apk_count=$((apk_count + 1))
+            echo "  ✅ $target ($(du -h "$f" | cut -f1))"
+          done < <(find artifacts -name '*.apk' -type f 2>/dev/null || true)
+
+          echo "=== Total APKs found: $apk_count ==="
+          if [ "$apk_count" -eq 0 ]; then
+            # 兜底：可能在 artifacts/ 的子目录里
+            echo "Trying full directory scan..."
+            find artifacts -type f -ls 2>/dev/null || true
+            exit 1  # 没有 APK 文件，让 job 失败
+          fi
           ls -lh release-apks/
 
       - name: Create / update release
