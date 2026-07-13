@@ -25,9 +25,12 @@ jobs:
 
       - name: Download Termux APK
         run: |
-          URL="https://github.com/termux/termux-app/releases/download/${TERMUX_VERSION}/termux-app_${TERMUX_VERSION}+github-debug_${{ matrix.termux-arch }}.apk"
-          echo "Downloading: $URL"
-          curl -fL -o termux.apk "$URL"
+          # 先拼接 URL
+          DL_URL="https://github.com/termux/termux-app/releases/download/${TERMUX_VERSION}/termux-app_${TERMUX_VERSION}+github-debug_${{ matrix.termux-arch }}.apk"
+          # 打印出来确认正确
+          echo "DEBUG: 下载地址 -> $DL_URL"
+          # 确认没问题了再下载
+          curl -fL -o termux.apk "$DL_URL"
           ls -lh termux.apk
 
       - name: Extract bootstrap
