@@ -11,10 +11,7 @@ import me.rerere.rikkahub.data.repository.FilesRepository
 import me.rerere.rikkahub.data.repository.GenMediaRepository
 import me.rerere.rikkahub.data.repository.MemoryRepository
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
-import me.rerere.workspace.ProotShellRunner
-import me.rerere.workspace.RootfsInstaller
-import me.rerere.workspace.WorkspaceBindMount
-import me.rerere.workspace.WorkspaceManager
+import me.rerere.workspace.*
 import org.koin.dsl.module
 import java.io.File
 
@@ -45,30 +42,47 @@ val repositoryModule = module {
 
     single {
         val context: Context = get()
+        val prootRunner = ProotShellRunner(
+            nativeLibraryDir = File(context.applicationInfo.nativeLibraryDir),
+            extraBindMounts = listOf(
+                WorkspaceBindMount(
+                    source = File(context.filesDir, FileFolders.SKILLS).apply { mkdirs() },
+                    target = "/skills",
+                ),
+                WorkspaceBindMount(
+                    source = File(context.filesDir, FileFolders.TOOL_OUTPUTS).apply { mkdirs() },
+                    target = "/tool_outputs",
+                ),
+                WorkspaceBindMount(
+                    source = File(context.filesDir, FileFolders.UPLOAD).apply { mkdirs() },
+                    target = "/upload",
+                ),
+            ),
+        )
+        val termuxRunner = TermuxShellRunner(
+            prefixDir = File(context.filesDir, "usr"),
+        )
         WorkspaceManager(
             baseDir = File(context.filesDir, "workspaces"),
-            shellRunner = ProotShellRunner(
-                nativeLibraryDir = File(context.applicationInfo.nativeLibraryDir),
-                extraBindMounts = listOf(
-                    WorkspaceBindMount(
-                        source = File(context.filesDir, FileFolders.SKILLS).apply { mkdirs() },
-                        target = "/skills",
-                    ),
-                    WorkspaceBindMount(
-                        source = File(context.filesDir, FileFolders.TOOL_OUTPUTS).apply { mkdirs() },
-                        target = "/tool_outputs",
-                    ),
-                    WorkspaceBindMount(
-                        source = File(context.filesDir, FileFolders.UPLOAD).apply { mkdirs() },
-                        target = "/upload",
-                    ),
-                ),
-            )
+            shellRunner = DelegatingShellRunner(
+                termuxRunner = termuxRunner,
+                prootRunner = prootRunner,
+                hostRunner = HostShellRunner(),
+                workspacesBase = File(context.filesDir, "workspaces"),
+            ),
         )
     }
 
     single {
         RootfsInstaller(get())
+    }
+
+    single {
+        val context: Context = get()
+        TermuxBootstrapInstaller(
+            context = context,
+            targetDir = File(context.filesDir, "usr"),
+        )
     }
 
     single {
