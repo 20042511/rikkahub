@@ -152,13 +152,19 @@ jobs:
 
       - name: Rename APKs
         run: |
-          for f in artifacts/*.apk; do
-            abi=$(echo "$f" | grep -oP '(arm64-v8a|x86_64)')
-            if [ -n "$abi" ]; then
-              mv "$f" "artifacts/rikkahub-escape-$abi-debug.apk"
-            fi
+          mkdir -p release-apks
+          find artifacts -name '*.apk' | while read f; do
+            basename=$(basename "$f")
+            # 从路径和文件名中提取 ABI 标识
+            case "$basename" in
+              *arm64*v8a*|*aarch64*)   abi="arm64-v8a" ;;
+              *x86_64*|*amd64*)         abi="x86_64"    ;;
+              *)                        abi="universal" ;;
+            esac
+            cp "$f" "release-apks/rikkahub-escape-$abi-debug.apk"
+            echo "  → rikkahub-escape-$abi-debug.apk ($(du -h "$f" | cut -f1))"
           done
-          ls -lh artifacts/
+          ls -lh release-apks/
 
       - name: Create / update release
         uses: softprops/action-gh-release@v2
@@ -180,5 +186,5 @@ jobs:
             - [x86_64 APK](artifacts/rikkahub-escape-x86_64-debug.apk) — 模拟器
 
             > ⚠️ Debug 版本，安装前需开启「允许安装未知来源应用」。
-          files: artifacts/rikkahub-escape-*-debug.apk
+          files: release-apks/rikkahub-escape-*-debug.apk
           make_latest: true
