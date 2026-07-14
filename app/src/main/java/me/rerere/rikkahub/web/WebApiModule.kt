@@ -36,6 +36,7 @@ import me.rerere.rikkahub.web.routes.eventsRoutes
 import me.rerere.rikkahub.web.routes.filesRoutes
 import me.rerere.rikkahub.web.routes.folderRoutes
 import me.rerere.rikkahub.web.routes.settingsRoutes
+import me.rerere.rikkahub.web.routes.workspaceRoutes
 import java.security.MessageDigest
 import java.util.Date
 import java.util.UUID
@@ -64,7 +65,8 @@ fun Application.configureWebApi(
     conversationRepo: ConversationRepository,
     folderRepo: FolderRepository,
     settingsStore: SettingsStore,
-    filesManager: FilesManager
+    filesManager: FilesManager,
+    workspaceRepository: me.rerere.rikkahub.data.repository.WorkspaceRepository? = null,
 ) {
     val jwtEnabled = settingsStore.settingsFlow.value.webServerJwtEnabled
 
@@ -166,6 +168,11 @@ fun Application.configureWebApi(
             }
 
             aiIconRoutes(context)
+
+            // workspace API — 直接调用 workspace 操作（用于测试和外部集成）
+            if (workspaceRepository != null) {
+                workspaceRoutes(workspaceRepository)
+            }
 
             if (jwtEnabled) {
                 authenticate("auth-jwt") {
