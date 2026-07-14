@@ -14,8 +14,8 @@ import me.rerere.workspace.DevToolsProvider
  * AI 开发工具集
  *
  * 为 AI Agent 提供完整的代码开发工作流工具：
- * - Git 操作
- * - 包管理
+ * - Git 操作（clone, status, diff, commit, log）
+ * - 包管理（install）
  * - 项目构建与测试
  */
 object DevToolNames {
@@ -40,9 +40,17 @@ val DevToolDefaultApprovals: Map<String, Boolean> = mapOf(
     DevToolNames.RUN_TESTS to true,
 )
 
+/**
+ * 创建 AI 开发工具列表
+ *
+ * @param workspaceId 工作区 ID
+ * @param workspaceRoot 工作区根目录路径（用于文件操作）
+ * @param approvalOverrides 审批覆盖配置
+ * @param devTools 开发工具提供者（Git, 包管理, 构建）
+ */
 fun createDevTools(
     workspaceId: String,
-    workspaceRepository: WorkspaceRepository,
+    workspaceRoot: String,
     approvalOverrides: Map<String, Boolean>,
     devTools: DevToolsProvider,
 ): List<Tool> {
@@ -50,42 +58,21 @@ fun createDevTools(
         approvalOverrides[name] ?: DevToolDefaultApprovals[name] ?: true
 
     return listOf(
-        createGitCloneTool(workspaceId, ::needsApproval, devTools),
-        createGitStatusTool(workspaceId, ::needsApproval, devTools),
-        createGitDiffTool(workspaceId, ::needsApproval, devTools),
-        createGitCommitTool(workspaceId, ::needsApproval, devTools),
-        createGitLogTool(workspaceId, ::needsApproval, devTools),
-        createPkgInstallTool(workspaceId, ::needsApproval, devTools),
-        createBuildProjectTool(workspaceId, ::needsApproval, devTools),
-        createRunTestsTool(workspaceId, ::needsApproval, devTools),
+        createGitCloneTool(workspaceRoot, ::needsApproval, devTools),
+        createGitStatusTool(workspaceRoot, ::needsApproval, devTools),
+        createGitDiffTool(workspaceRoot, ::needsApproval, devTools),
+        createGitCommitTool(workspaceRoot, ::needsApproval, devTools),
+        createGitLogTool(workspaceRoot, ::needsApproval, devTools),
+        createPkgInstallTool(workspaceRoot, ::needsApproval, devTools),
+        createBuildProjectTool(workspaceRoot, ::needsApproval, devTools),
+        createRunTestsTool(workspaceRoot, ::needsApproval, devTools),
     )
-}
-
-private fun workspaceRoot(workspaceId: String, repo: WorkspaceRepository): String? {
-    val entity = runBlockingCatching { repo.getById(workspaceId) } ?: return null
-    return entity?.root
-}
-
-private fun <T> runBlockingCatching(block: suspend () -> T): T? {
-    return try {
-        kotlinx.coroutines.runBlocking { block() }
-    } catch (e: Exception) {
-        null
-    }
-}
-
-private val ROOT_CACHE = mutableMapOf<String, String?>()
-
-private fun getRoot(workspaceId: String): String? = ROOT_CACHE[workspaceId]
-
-fun cacheWorkspaceRoot(workspaceId: String, root: String) {
-    ROOT_CACHE[workspaceId] = root
 }
 
 // ── Git Clone ────────────────────────────────────────
 
 private fun createGitCloneTool(
-    workspaceId: String,
+    workspaceRoot: String,
     needsApproval: (String) -> Boolean,
     devTools: DevToolsProvider,
 ) = Tool(
@@ -121,8 +108,7 @@ private fun createGitCloneTool(
         val directory = params["directory"]?.jsonPrimitive?.contentOrNull
         val branch = params["branch"]?.jsonPrimitive?.contentOrNull
         val depth = params["depth"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
-        val root = getRoot(workspaceId) ?: error("Workspace root not cached")
-        val result = devTools.gitClone(root, url, directory, branch, depth)
+        val result = devTools.gitClone(workspaceRoot, url, directory, branch, depth)
         listOf(UIMessagePart.Text(
             buildJsonObject {
                 put("success", result.success)
@@ -136,7 +122,7 @@ private fun createGitCloneTool(
 // ── Git Status ────────────────────────────────────────
 
 private fun createGitStatusTool(
-    workspaceId: String,
+    workspaceRoot: String,
     needsApproval: (String) -> Boolean,
     devTools: DevToolsProvider,
 ) = Tool(
@@ -156,8 +142,7 @@ private fun createGitStatusTool(
     execute = { args ->
         val params = args.jsonObject
         val cwd = params["cwd"]?.jsonPrimitive?.contentOrNull ?: ""
-        val root = getRoot(workspaceId) ?: error("Workspace root not cached")
-        val result = devTools.gitStatus(root, cwd)
+        val result = devTools.gitStatus(workspaceRoot, cwd)
         listOf(UIMessagePart.Text(
             buildJsonObject {
                 put("success", result.success)
@@ -171,7 +156,7 @@ private fun createGitStatusTool(
 // ── Git Diff ──────────────────────────────────────────
 
 private fun createGitDiffTool(
-    workspaceId: String,
+    workspaceRoot: String,
     needsApproval: (String) -> Boolean,
     devTools: DevToolsProvider,
 ) = Tool(
@@ -201,8 +186,7 @@ private fun createGitDiffTool(
         val staged = params["staged"]?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() ?: false
         val path = params["path"]?.jsonPrimitive?.contentOrNull
         val cwd = params["cwd"]?.jsonPrimitive?.contentOrNull ?: ""
-        val root = getRoot(workspaceId) ?: error("Workspace root not cached")
-        val result = devTools.gitDiff(root, staged, path, cwd)
+        val result = devTools.gitDiff(workspaceRoot, staged, path, cwd)
         listOf(UIMessagePart.Text(
             buildJsonObject {
                 put("success", result.success)
@@ -216,7 +200,7 @@ private fun createGitDiffTool(
 // ── Git Commit ────────────────────────────────────────
 
 private fun createGitCommitTool(
-    workspaceId: String,
+    workspaceRoot: String,
     needsApproval: (String) -> Boolean,
     devTools: DevToolsProvider,
 ) = Tool(
@@ -247,8 +231,7 @@ private fun createGitCommitTool(
         val message = params["message"]?.jsonPrimitive?.contentOrNull ?: error("message is required")
         val all = params["all"]?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() ?: false
         val cwd = params["cwd"]?.jsonPrimitive?.contentOrNull ?: ""
-        val root = getRoot(workspaceId) ?: error("Workspace root not cached")
-        val result = devTools.gitCommit(root, message, all, cwd)
+        val result = devTools.gitCommit(workspaceRoot, message, all, cwd)
         listOf(UIMessagePart.Text(
             buildJsonObject {
                 put("success", result.success)
@@ -262,7 +245,7 @@ private fun createGitCommitTool(
 // ── Git Log ───────────────────────────────────────────
 
 private fun createGitLogTool(
-    workspaceId: String,
+    workspaceRoot: String,
     needsApproval: (String) -> Boolean,
     devTools: DevToolsProvider,
 ) = Tool(
@@ -287,8 +270,7 @@ private fun createGitLogTool(
         val params = args.jsonObject
         val maxCount = params["maxCount"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 10
         val cwd = params["cwd"]?.jsonPrimitive?.contentOrNull ?: ""
-        val root = getRoot(workspaceId) ?: error("Workspace root not cached")
-        val result = devTools.gitLog(root, maxCount, cwd)
+        val result = devTools.gitLog(workspaceRoot, maxCount, cwd)
         listOf(UIMessagePart.Text(
             buildJsonObject {
                 put("success", result.success)
@@ -302,7 +284,7 @@ private fun createGitLogTool(
 // ── Package Install ───────────────────────────────────
 
 private fun createPkgInstallTool(
-    workspaceId: String,
+    workspaceRoot: String,
     needsApproval: (String) -> Boolean,
     devTools: DevToolsProvider,
 ) = Tool(
@@ -329,8 +311,7 @@ private fun createPkgInstallTool(
         val packagesStr = params["packages"]?.jsonPrimitive?.contentOrNull ?: error("packages is required")
         val manager = params["manager"]?.jsonPrimitive?.contentOrNull
         val packages = packagesStr.split("\\s+".toRegex()).filter { it.isNotBlank() }
-        val root = getRoot(workspaceId) ?: error("Workspace root not cached")
-        val result = devTools.installPackages(root, packages, manager)
+        val result = devTools.installPackages(workspaceRoot, packages, manager)
         listOf(UIMessagePart.Text(
             buildJsonObject {
                 put("success", result.success)
@@ -344,7 +325,7 @@ private fun createPkgInstallTool(
 // ── Build Project ─────────────────────────────────────
 
 private fun createBuildProjectTool(
-    workspaceId: String,
+    workspaceRoot: String,
     needsApproval: (String) -> Boolean,
     devTools: DevToolsProvider,
 ) = Tool(
@@ -369,8 +350,7 @@ private fun createBuildProjectTool(
         val params = args.jsonObject
         val path = params["path"]?.jsonPrimitive?.contentOrNull ?: ""
         val command = params["command"]?.jsonPrimitive?.contentOrNull
-        val root = getRoot(workspaceId) ?: error("Workspace root not cached")
-        val result = devTools.buildProject(root, path, command)
+        val result = devTools.buildProject(workspaceRoot, path, command)
         listOf(UIMessagePart.Text(
             buildJsonObject {
                 put("success", result.success)
@@ -385,7 +365,7 @@ private fun createBuildProjectTool(
 // ── Run Tests ─────────────────────────────────────────
 
 private fun createRunTestsTool(
-    workspaceId: String,
+    workspaceRoot: String,
     needsApproval: (String) -> Boolean,
     devTools: DevToolsProvider,
 ) = Tool(
@@ -410,8 +390,7 @@ private fun createRunTestsTool(
         val params = args.jsonObject
         val path = params["path"]?.jsonPrimitive?.contentOrNull ?: ""
         val filter = params["filter"]?.jsonPrimitive?.contentOrNull
-        val root = getRoot(workspaceId) ?: error("Workspace root not cached")
-        val result = devTools.runTests(root, path, filter)
+        val result = devTools.runTests(workspaceRoot, path, filter)
         listOf(UIMessagePart.Text(
             buildJsonObject {
                 put("success", result.success)

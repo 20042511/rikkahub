@@ -47,7 +47,6 @@ import me.rerere.rikkahub.data.ai.GenerationChunk
 import me.rerere.rikkahub.data.ai.GenerationHandler
 import me.rerere.rikkahub.data.ai.mcp.McpManager
 import me.rerere.rikkahub.data.ai.tools.createConversationTools
-import me.rerere.rikkahub.data.ai.tools.dev.cacheWorkspaceRoot
 import me.rerere.rikkahub.data.ai.tools.dev.createDevTools
 import me.rerere.rikkahub.data.ai.tools.dev.createTerminalTools
 import me.rerere.rikkahub.data.ai.tools.local.LocalTools
@@ -649,9 +648,6 @@ class ChatService(
             return emptyList()
         }
 
-        // 缓存 workspace root 供 dev tools 使用
-        cacheWorkspaceRoot(workspaceId, workspace.root)
-
         // 基础 workspace 工具 (read, write, edit, shell)
         val baseTools = createWorkspaceTools(workspaceId, workspaceRepository, cwd)
 
@@ -661,7 +657,7 @@ class ChatService(
         val devToolList = if (manager != null) {
             createDevTools(
                 workspaceId = workspaceId,
-                workspaceRepository = workspaceRepository,
+                workspaceRoot = workspace.root,
                 approvalOverrides = workspace.toolApprovalOverrides(),
                 devTools = manager.devTools,
             )
