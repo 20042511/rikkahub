@@ -678,7 +678,7 @@ class ChatService(
         try {
             org.koin.java.KoinJavaComponent.get<me.rerere.workspace.WorkspaceManager>(
                 me.rerere.workspace.WorkspaceManager::class.java
-            ).value
+            )
         } catch (e: Exception) {
             Log.w(TAG, "getWorkspaceManager: failed to get from DI", e)
             null
