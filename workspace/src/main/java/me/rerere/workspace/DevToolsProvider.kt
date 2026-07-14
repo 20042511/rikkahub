@@ -91,7 +91,7 @@ class DevToolsProvider(
     ): GitResult {
         val args = mutableListOf("diff")
         if (staged) args.add("--cached")
-        path?.let { args.add("--", it) }
+        if (path != null) { args.add("--"); args.add(path) }
         return git(workspaceRoot, args, cwd)
     }
 
