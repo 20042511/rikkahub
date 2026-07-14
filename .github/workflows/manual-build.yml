@@ -1,17 +1,6 @@
 name: Manual Build APK
-
 on:
   workflow_dispatch:
-    inputs:
-      build_type:
-        description: 'Build type'
-        required: true
-        default: 'debug'
-        type: choice
-        options:
-          - debug
-          - release
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,29 +9,24 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 11
-
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
           cache-dependency-path: web-ui/pnpm-lock.yaml
-
       - name: Install web-ui dependencies
         working-directory: web-ui
         run: pnpm install --frozen-lockfile
-
       - name: Gradle cache
         uses: actions/cache@v4
         with:
@@ -50,79 +34,15 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-
-      - name: Prepare google-services.json
-        run: |
-          if [ -n "${{ secrets.GOOGLE_SERVICES_JSON }}" ]; then
-            echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
-          else
-            # Create a minimal google-services.json for debug builds
-            # Firebase features will be unavailable, but build will succeed
-            cat > app/google-services.json << 'EOF'
-{
-  "project_info": {
-    "project_number": "000000000000",
-    "project_id": "rikkahub-debug",
-    "storage_bucket": "rikkahub-debug.appspot.com"
-  },
-  "client": [
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
-        "android_client_info": {
-          "package_name": "me.rerere.rikkahub"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSy00000000000000000000000000000000000"
-        }
-      ],
-      "services": {
-        "analytics_service": {
-          "status": 2
-        },
-        "appinvite_service": {
-          "status": 2
-        },
-        "ads_service": {
-          "status": 2
-        }
-      }
-    }
-  ],
-  "configuration_version": "1"
-}
-EOF
-          fi
-
-      - name: Build APK
+      - name: Create google-services.json
+        run: echo '{"project_info":{"project_number":"000000000000","project_id":"rikkahub-debug","storage_bucket":"rikkahub-debug.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:0000000000000000","android_client_info":{"package_name":"me.rerere.rikkahub"}},"oauth_client":[],"api_key":[{"current_key":"dummy"}],"services":{"analytics_service":{"status":2},"appinvite_service":{"status":2},"ads_service":{"status":2}}}],"configuration_version":"1"}' > app/google-services.json
+      - name: Build APK (debug)
         run: |
           chmod +x gradlew
-          if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
-            if [ -n "${{ secrets.KEY_BASE64 }}" ]; then
-              echo "${{ secrets.KEY_BASE64 }}" | base64 -d > app/app.key
-              echo "${{ secrets.SIGNING_CONFIG }}" > local.properties
-            fi
-            ./gradlew assembleRelease
-          else
-            ./gradlew assembleDebug
-          fi
-
+          ./gradlew assembleDebug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: rikkahub-${{ github.event.inputs.build_type }}-${{ github.sha }}
-          path: |
-            app/build/outputs/apk/debug/*.apk
-            app/build/outputs/apk/release/*.apk
+          name: rikkahub-debug-${{ github.sha }}
+          path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
-
-      - name: Upload mapping (release only)
-        if: github.event.inputs.build_type == 'release'
-        uses: actions/upload-artifact@v4
-        with:
-          name: mapping-${{ github.sha }}
-          path: app/build/outputs/mapping/release/
-          if-no-files-found: ignore
