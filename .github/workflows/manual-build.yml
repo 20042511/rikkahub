@@ -51,16 +51,60 @@ jobs:
             ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
 
+      - name: Prepare google-services.json
+        run: |
+          if [ -n "${{ secrets.GOOGLE_SERVICES_JSON }}" ]; then
+            echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
+          else
+            # Create a minimal google-services.json for debug builds
+            # Firebase features will be unavailable, but build will succeed
+            cat > app/google-services.json << 'EOF'
+{
+  "project_info": {
+    "project_number": "000000000000",
+    "project_id": "rikkahub-debug",
+    "storage_bucket": "rikkahub-debug.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+        "android_client_info": {
+          "package_name": "me.rerere.rikkahub"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSy00000000000000000000000000000000000"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 2
+        },
+        "appinvite_service": {
+          "status": 2
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
+EOF
+          fi
+
       - name: Build APK
         run: |
           chmod +x gradlew
           if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
-            # 如果有签名配置则签名，否则构建 unsigned release
             if [ -n "${{ secrets.KEY_BASE64 }}" ]; then
               echo "${{ secrets.KEY_BASE64 }}" | base64 -d > app/app.key
               echo "${{ secrets.SIGNING_CONFIG }}" > local.properties
             fi
-            echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json 2>/dev/null || true
             ./gradlew assembleRelease
           else
             ./gradlew assembleDebug
