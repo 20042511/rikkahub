@@ -35,7 +35,17 @@ class ExecutionEngine(
 
     /** 需要 PROOT 引擎的工具（如果存在宿主版本则优先用 HOST） */
     private val prootPreferredCommands = setOf(
-        "java", "javac", "jar",
+        // 编译/构建工具（通常在 proot rootfs 中，宿主没有）
+        "git", "gcc", "g++", "make", "cmake", "cc", "c++",
+        "java", "javac", "jar", "mvn", "mvnw", "gradle", "gradlew",
+        "python", "python3", "pip", "pip3",
+        "node", "npm", "npx", "yarn", "pnpm",
+        "rustc", "cargo", "go",
+        "gem", "bundle", "rake",
+        "php", "composer",
+        "perl",
+        "swift",
+        "dart", "flutter",
     )
 
     /**
