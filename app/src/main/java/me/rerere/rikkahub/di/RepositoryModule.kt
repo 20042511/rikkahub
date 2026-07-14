@@ -47,7 +47,7 @@ val repositoryModule = module {
         val context: Context = get()
         WorkspaceManager(
             baseDir = File(context.filesDir, "workspaces"),
-            shellRunner = ProotShellRunner(
+            prootRunner = ProotShellRunner(
                 nativeLibraryDir = File(context.applicationInfo.nativeLibraryDir),
                 extraBindMounts = listOf(
                     WorkspaceBindMount(

@@ -9,12 +9,33 @@ import java.nio.charset.StandardCharsets
 class WorkspaceManager(
     private val baseDir: File,
     private val config: WorkspaceConfig = WorkspaceConfig(),
-    private val shellRunner: WorkspaceShellRunner = HostShellRunner(),
+    private val prootRunner: ProotShellRunner? = null,
 ) {
     private val fileSystem = WorkspaceFileSystem(config)
 
+    /** 混合执行引擎（自动路由 HOST/PROOT） */
+    val executionEngine: ExecutionEngine
+
+    /** 开发工具提供者（Git, 包管理, 构建） */
+    val devTools: DevToolsProvider
+
+    /** 终端会话管理器 */
+    val terminalSessionManager: TerminalSessionManager
+
     init {
         baseDir.mkdirs()
+
+        // 构建执行引擎
+        val hostRunner = HostShellRunner()
+        val effectiveProotRunner = prootRunner ?: ProotShellRunner(
+            nativeLibraryDir = File("/system/lib64"),
+        )
+        executionEngine = ExecutionEngine(
+            prootRunner = effectiveProotRunner,
+            hostRunner = hostRunner,
+        )
+        devTools = DevToolsProvider(executionEngine)
+        terminalSessionManager = TerminalSessionManager()
     }
 
     fun ensureWorkspace(root: String): File {
@@ -132,19 +153,20 @@ class WorkspaceManager(
         require(workingDir.exists()) { "Working directory does not exist: $cwd" }
         require(workingDir.isDirectory) { "Working path is not a directory: $cwd" }
 
-        return shellRunner.execute(
-            WorkspaceShellContext(
-                root = root,
-                command = command,
-                cwd = cwd,
-                filesDir = filesDir(root),
-                linuxDir = linuxDir(root),
-                tempDir = tempDir(root),
-                workingDir = workingDir,
-                timeoutMillis = timeoutMillis,
-                stdin = stdin,
-            )
+        val context = WorkspaceShellContext(
+            root = root,
+            command = command,
+            cwd = cwd,
+            filesDir = filesDir(root),
+            linuxDir = linuxDir(root),
+            tempDir = tempDir(root),
+            workingDir = workingDir,
+            timeoutMillis = timeoutMillis,
+            stdin = stdin,
         )
+
+        // 使用混合执行引擎自动路由
+        return executionEngine.execute(context)
     }
 
     private fun requireValidRoot(root: String) {
