@@ -1,5 +1,7 @@
 package me.rerere.rikkahub.data.ai.tools.dev
 
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -192,7 +194,13 @@ fun createTerminalTools(
                         put("signal", buildJsonObject {
                             put("type", "string")
                             put("description", "Signal type: SIGINT (Ctrl+C), SIGTERM, SIGKILL, SIGQUIT, SIGTSTP (Ctrl+Z)")
-                            put("enum", "[\"SIGINT\",\"SIGTERM\",\"SIGKILL\",\"SIGQUIT\",\"SIGTSTP\"]")
+                            put("enum", buildJsonArray {
+                                add(JsonPrimitive("SIGINT"))
+                                add(JsonPrimitive("SIGTERM"))
+                                add(JsonPrimitive("SIGKILL"))
+                                add(JsonPrimitive("SIGQUIT"))
+                                add(JsonPrimitive("SIGTSTP"))
+                            })
                         })
                     },
                     required = listOf("session_id", "signal"),
