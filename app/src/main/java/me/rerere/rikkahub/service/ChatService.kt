@@ -47,6 +47,8 @@ import me.rerere.rikkahub.data.ai.GenerationChunk
 import me.rerere.rikkahub.data.ai.GenerationHandler
 import me.rerere.rikkahub.data.ai.mcp.McpManager
 import me.rerere.rikkahub.data.ai.tools.createConversationTools
+import me.rerere.rikkahub.data.ai.tools.dev.createDevTools
+import me.rerere.rikkahub.data.ai.tools.dev.createTerminalTools
 import me.rerere.rikkahub.data.ai.tools.local.LocalTools
 import me.rerere.rikkahub.data.ai.tools.createSearchTools
 import me.rerere.rikkahub.data.ai.tools.createSkillTools
@@ -645,8 +647,42 @@ class ChatService(
             )
             return emptyList()
         }
-        return createWorkspaceTools(workspaceId, workspaceRepository, cwd)
+
+        // 基础 workspace 工具 (read, write, edit, shell)
+        val baseTools = createWorkspaceTools(workspaceId, workspaceRepository, cwd)
+
+        // 开发工具 (git, pkg, build, test)
+        // WorkspaceManager 已通过 DI 注入，获取其 devTools 和 terminalSessionManager
+        val manager = getWorkspaceManager()
+        val devToolList = if (manager != null) {
+            createDevTools(
+                workspaceId = workspaceId,
+                workspaceRoot = workspace.root,
+                approvalOverrides = workspace.toolApprovalOverrides(),
+                devTools = manager.devTools,
+            )
+        } else emptyList()
+
+        // 终端会话工具
+        val terminalToolList = if (manager != null) {
+            createTerminalTools(
+                terminalSessionManager = manager.terminalSessionManager,
+                approvalOverrides = workspace.toolApprovalOverrides(),
+            )
+        } else emptyList()
+
+        return baseTools + devToolList + terminalToolList
     }
+
+    private fun getWorkspaceManager(): me.rerere.workspace.WorkspaceManager? =
+        try {
+            org.koin.java.KoinJavaComponent.get<me.rerere.workspace.WorkspaceManager>(
+                me.rerere.workspace.WorkspaceManager::class.java
+            ).value
+        } catch (e: Exception) {
+            Log.w(TAG, "getWorkspaceManager: failed to get from DI", e)
+            null
+        }
 
     // ---- 检查无效消息 ----
 

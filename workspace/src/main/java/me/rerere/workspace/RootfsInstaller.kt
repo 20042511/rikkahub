@@ -20,6 +20,7 @@ class RootfsInstaller(
         root: String,
         url: String,
         onProgress: (RootfsInstallProgress) -> Unit = {},
+        bootstrapScript: String? = null,
     ) {
         require(url.isNotBlank()) { "Rootfs download url is required" }
         manager.ensureWorkspace(root)
@@ -39,10 +40,47 @@ class RootfsInstaller(
                 "Failed to move rootfs into workspace"
             }
             patcher.patch(linuxDir)
+
+            // 安装后运行引导脚本（安装开发工具等）
+            if (!bootstrapScript.isNullOrBlank()) {
+                runBootstrap(linuxDir, bootstrapScript)
+            }
+
             onProgress(RootfsInstallProgress(stage = RootfsInstallStage.INSTALLED))
         } finally {
             archive.delete()
             stagingDir.deleteRecursively()
+        }
+    }
+
+    /**
+     * 在 rootfs 中运行引导脚本（通过 proot chroot）
+     */
+    private fun runBootstrap(linuxDir: File, script: String) {
+        val scriptFile = File(linuxDir, "/tmp/bootstrap.sh")
+        scriptFile.parentFile?.mkdirs()
+        scriptFile.writeText(script)
+        scriptFile.setExecutable(true)
+
+        try {
+            val process = ProcessBuilder(
+                "/system/bin/sh", "-c",
+                "proot --root ${linuxDir.absolutePath} --bind /proc:/proc --bind /dev:/dev /bin/sh /tmp/bootstrap.sh"
+            ).redirectErrorStream(true)
+                .start()
+
+            val output = process.inputStream.bufferedReader().readText()
+            val exitCode = process.waitFor()
+
+            if (exitCode != 0) {
+                android.util.Log.w(TAG, "Bootstrap script exited with code $exitCode:\n$output")
+            } else {
+                android.util.Log.d(TAG, "Bootstrap script completed successfully:\n$output.take(500)")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Bootstrap script failed", e)
+        } finally {
+            scriptFile.delete()
         }
     }
 
@@ -409,6 +447,7 @@ class RootfsInstaller(
     }
 
     companion object {
+        private const val TAG = "RootfsInstaller"
         private const val TAR_BLOCK_SIZE = 512
         private const val BUFFER_SIZE = 64 * 1024
         private const val PROGRESS_STEP_BYTES = 512 * 1024

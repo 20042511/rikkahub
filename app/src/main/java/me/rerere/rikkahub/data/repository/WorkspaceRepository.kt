@@ -139,6 +139,18 @@ class WorkspaceRepository(
         }
     }
 
+    suspend fun grep(
+        id: String,
+        query: String,
+        path: String = "",
+        regex: Boolean = false,
+        ignoreCase: Boolean = true,
+        includeGlob: String? = null,
+    ): List<me.rerere.workspace.WorkspaceSearchMatch> = withContext(Dispatchers.IO) {
+        val workspace = dao.getById(id) ?: return@withContext emptyList()
+        manager.grep(workspace.root, query, path, regex, ignoreCase, includeGlob)
+    }
+
     suspend fun listFiles(
         id: String,
         area: WorkspaceStorageArea,

@@ -10,6 +10,7 @@
 #include <termios.h>
 #include <unistd.h>
 #include <vector>
+#include <signal.h>
 
 #define LOG_TAG "RikkaTermuxJni"
 
@@ -97,6 +98,7 @@ Java_com_termux_terminal_JNI_createSubprocess(
     }
 
     if (pid == 0) {
+        // Child process
         setsid();
         const int slave = open(slave_name, O_RDWR);
         if (slave < 0) _exit(127);
@@ -121,6 +123,7 @@ Java_com_termux_terminal_JNI_createSubprocess(
         _exit(127);
     }
 
+    // Parent process
     if (processId != nullptr) {
         jint process_ids[1] = {static_cast<jint>(pid)};
         env->SetIntArrayRegion(processId, 0, 1, process_ids);
@@ -153,4 +156,106 @@ Java_com_termux_terminal_JNI_waitFor(JNIEnv *, jclass, jint pid) {
 extern "C" JNIEXPORT void JNICALL
 Java_com_termux_terminal_JNI_close(JNIEnv *, jclass, jint fd) {
     close(fd);
+}
+
+/**
+ * 向 PTY 文件描述符写入数据
+ * @param fd PTY master fd
+ * @param data 要写入的字节数组
+ * @return 实际写入的字节数，失败返回 -1
+ */
+extern "C" JNIEXPORT jint JNICALL
+Java_com_termux_terminal_JNI_writeFd(
+        JNIEnv *env,
+        jclass,
+        jint fd,
+        jbyteArray data) {
+    jsize len = env->GetArrayLength(data);
+    jbyte *bytes = env->GetByteArrayElements(data, nullptr);
+    if (bytes == nullptr) return -1;
+
+    ssize_t written = write(fd, bytes, static_cast<size_t>(len));
+    env->ReleaseByteArrayElements(data, bytes, JNI_ABORT);
+
+    if (written < 0) {
+        __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "write fd %d failed: %s", fd, strerror(errno));
+        return -1;
+    }
+    return static_cast<jint>(written);
+}
+
+/**
+ * 从 PTY 文件描述符读取数据
+ * @param fd PTY master fd
+ * @param buffer 接收数据的缓冲区
+ * @return 实际读取的字节数，0 表示无数据，-1 表示错误
+ */
+extern "C" JNIEXPORT jint JNICALL
+Java_com_termux_terminal_JNI_readFd(
+        JNIEnv *env,
+        jclass,
+        jint fd,
+        jbyteArray buffer) {
+    jsize len = env->GetArrayLength(buffer);
+    jbyte *bytes = env->GetByteArrayElements(buffer, nullptr);
+    if (bytes == nullptr) return -1;
+
+    ssize_t read_count = read(fd, bytes, static_cast<size_t>(len));
+    env->ReleaseByteArrayElements(buffer, bytes, 0);
+
+    if (read_count < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            // Non-blocking read, no data available
+            return 0;
+        }
+        __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "read fd %d failed: %s", fd, strerror(errno));
+        return -1;
+    }
+    return static_cast<jint>(read_count);
+}
+
+/**
+ * 向 PTY 中的进程发送信号
+ * @param fd PTY master fd (未使用，保留以保持接口一致性)
+ * @param signal 信号编号 (SIGINT=2, SIGTERM=15, SIGKILL=9, SIGQUIT=3)
+ * 注意：通过 PTY 发送信号的最佳方式是向 slave 的前台进程组发送信号。
+ * 这里使用 TIOSIGSEND 或直接通过 tcsetpgrp 获取前台进程组后 kill。
+ * 简化实现：直接通过 kill(0, signal) 或者写入控制字符。
+ */
+extern "C" JNIEXPORT void JNICALL
+Java_com_termux_terminal_JNI_sendSignal(
+        JNIEnv *env,
+        jclass,
+        jint fd,
+        jint signal) {
+    // 通过 TIOSIGSEND ioctl 或者向 PTY 写入控制字符
+    // 对于 SIGINT (2)，写入 Ctrl+C (0x03)
+    // 对于 SIGQUIT (3)，写入 Ctrl+\ (0x1C)
+    // 对于 SIGTSTP (20)，写入 Ctrl+Z (0x1A)
+    // 对于 SIGTERM 和 SIGKILL，需要获取子进程 PID 后 kill
+
+    unsigned char ctrl_char = 0;
+    switch (signal) {
+        case SIGINT:  // 2
+            ctrl_char = 0x03;
+            break;
+        case SIGQUIT: // 3
+            ctrl_char = 0x1C;
+            break;
+        case SIGTSTP: // 20
+            ctrl_char = 0x1A;
+            break;
+        default:
+            // SIGTERM/SIGKILL 需要在 Java 层通过 Process.destroy() 处理
+            // 此处仅记录日志
+            __android_log_print(ANDROID_LOG_WARN, LOG_TAG,
+                "sendSignal: signal %d not supported via PTY control chars, use Process.destroy()", signal);
+            return;
+    }
+
+    if (ctrl_char != 0) {
+        write(fd, &ctrl_char, 1);
+        __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG,
+            "sendSignal: wrote control char 0x%02x for signal %d to fd %d", ctrl_char, signal, fd);
+    }
 }

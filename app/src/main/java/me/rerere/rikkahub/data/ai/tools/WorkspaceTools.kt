@@ -23,11 +23,15 @@ import java.io.ByteArrayOutputStream
 
 private const val SHELL_TIMEOUT_MAX_SECONDS = 600L
 private const val MAX_READ_FILE_BYTES = 8L * 1024 * 1024
+private const val MAX_LIST_ENTRIES = 200
+private const val MAX_SEARCH_RESULTS = 50
 
 val WorkspaceToolDefaultApprovals: Map<String, Boolean> = mapOf(
     "workspace_read_file" to false,
     "workspace_write_file" to false,
     "workspace_edit_file" to false,
+    "workspace_list_files" to false,
+    "workspace_search_files" to false,
     "workspace_shell" to true,
 )
 
@@ -49,6 +53,8 @@ suspend fun createWorkspaceTools(
         createReadFileTool(workspaceId, ::needsApproval, workspaceRepository),
         createWriteFileTool(workspaceId, ::needsApproval, workspaceRepository),
         createEditFileTool(workspaceId, ::needsApproval, workspaceRepository),
+        createListFilesTool(workspaceId, ::needsApproval, workspaceRepository),
+        createSearchFilesTool(workspaceId, ::needsApproval, workspaceRepository),
         createShellTool(workspaceId, ::needsApproval, workspaceRepository, shellCwd),
     )
 }
@@ -196,6 +202,108 @@ private fun createEditFileTool(
                 metadata = diff?.let { d -> DiffMetadata(diff = d).toMetadata() },
             )
         )
+    },
+)
+
+private fun createListFilesTool(
+    workspaceId: String,
+    needsApproval: (String) -> Boolean,
+    workspaceRepository: WorkspaceRepository,
+) = Tool(
+    name = "workspace_list_files",
+    description = "List files and directories in the workspace. Use /workspace for the workspace files area.",
+    parameters = {
+        InputSchema.Obj(
+            properties = buildJsonObject {
+                put("path", buildJsonObject {
+                    put("type", "string")
+                    put("description", "Directory path to list. Defaults to /workspace")
+                })
+            },
+        )
+    },
+    needsApproval = { needsApproval("workspace_list_files") },
+    execute = {
+        val path = it.jsonObject["path"]?.jsonPrimitive?.contentOrNull?.trimEnd('/')?.ifBlank { "/workspace" } ?: "/workspace"
+        val files = if (path.startsWith("/workspace")) {
+            val relativePath = path.removePrefix("/workspace").trimStart('/')
+            workspaceRepository.listFiles(workspaceId, me.rerere.workspace.WorkspaceStorageArea.FILES, relativePath)
+        } else {
+            workspaceRepository.listFiles(workspaceId, me.rerere.workspace.WorkspaceStorageArea.LINUX, path.trimStart('/'))
+        }
+        val entries = files.take(MAX_LIST_ENTRIES).map { entry ->
+            buildJsonObject {
+                put("path", entry.path)
+                put("name", entry.name)
+                put("isDirectory", entry.isDirectory)
+                put("sizeBytes", entry.sizeBytes)
+            }
+        }
+        val total = files.size
+        val truncated = total > MAX_LIST_ENTRIES
+        listOf(UIMessagePart.Text(
+            buildJsonObject {
+                put("path", path)
+                put("total", total)
+                put("truncated", truncated)
+                put("entries", entries.joinToString(",") { it.toString() })
+            }.toString()
+        ))
+    },
+)
+
+private fun createSearchFilesTool(
+    workspaceId: String,
+    needsApproval: (String) -> Boolean,
+    workspaceRepository: WorkspaceRepository,
+) = Tool(
+    name = "workspace_search_files",
+    description = "Search file contents using grep with regex support across the workspace.",
+    parameters = {
+        InputSchema.Obj(
+            properties = buildJsonObject {
+                put("query", buildJsonObject {
+                    put("type", "string")
+                    put("description", "Search pattern")
+                })
+                put("path", buildJsonObject {
+                    put("type", "string")
+                    put("description", "Search path relative to /workspace (optional)")
+                })
+                put("regex", buildJsonObject {
+                    put("type", "boolean")
+                    put("description", "Use regex pattern (default: false)")
+                })
+                put("include", buildJsonObject {
+                    put("type", "string")
+                    put("description", "File glob pattern (e.g. *.kt, *.py)")
+                })
+            },
+            required = listOf("query"),
+        )
+    },
+    needsApproval = { needsApproval("workspace_search_files") },
+    execute = {
+        val params = it.jsonObject
+        val query = params["query"]?.jsonPrimitive?.contentOrNull ?: error("query is required")
+        val path = params["path"]?.jsonPrimitive?.contentOrNull ?: ""
+        val regex = params["regex"]?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() ?: false
+        val include = params["include"]?.jsonPrimitive?.contentOrNull
+        val results = workspaceRepository.grep(workspaceId, query, path, regex, includeGlob = include)
+        val matches = results.take(MAX_SEARCH_RESULTS).map { match ->
+            buildJsonObject {
+                put("path", match.path)
+                put("line", match.line)
+                put("text", match.text.take(200))
+            }
+        }
+        listOf(UIMessagePart.Text(
+            buildJsonObject {
+                put("total", results.size)
+                put("truncated", results.size > MAX_SEARCH_RESULTS)
+                put("results", matches.joinToString(",") { it.toString() })
+            }.toString()
+        ))
     },
 )
 
