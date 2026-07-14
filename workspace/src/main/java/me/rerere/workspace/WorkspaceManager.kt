@@ -34,7 +34,7 @@ class WorkspaceManager(
             prootRunner = effectiveProotRunner,
             hostRunner = hostRunner,
         )
-        devTools = DevToolsProvider(executionEngine)
+        devTools = DevToolsProvider(executionEngine, this)
         terminalSessionManager = TerminalSessionManager()
     }
 

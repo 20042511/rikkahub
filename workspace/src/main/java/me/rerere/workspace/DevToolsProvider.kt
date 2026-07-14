@@ -13,9 +13,11 @@ import java.util.concurrent.TimeUnit
  * - 项目构建 (build, test, lint)
  *
  * 所有操作通过 ExecutionEngine 自动选择最佳引擎执行。
+ * 通过 WorkspaceManager 获取正确的 workspace 目录路径。
  */
 class DevToolsProvider(
     private val executionEngine: ExecutionEngine,
+    private val workspaceManager: WorkspaceManager,
 ) {
     // ── Git 操作 ─────────────────────────────────────────
 
@@ -35,17 +37,7 @@ class DevToolsProvider(
         timeoutMillis: Long = 60_000L,
     ): GitResult {
         val gitCmd = "git ${args.joinToString(" ")}"
-        val context = WorkspaceShellContext(
-            root = workspaceRoot,
-            command = gitCmd,
-            cwd = cwd,
-            // These are filled by the WorkspaceManager, but for direct use:
-            filesDir = File("/dev/null"),
-            linuxDir = File("/dev/null"),
-            tempDir = File("/dev/null"),
-            workingDir = File("/dev/null"),
-            timeoutMillis = timeoutMillis,
-        )
+        val context = buildContext(workspaceRoot, gitCmd, cwd, timeoutMillis)
         val engine = executionEngine.resolveEngine(gitCmd, cwd)
         val result = executionEngine.execute(context, engine)
         return GitResult(
@@ -266,56 +258,47 @@ class DevToolsProvider(
 
     // ── 内部方法 ─────────────────────────────────────────
 
+    /** 构建正确的 WorkspaceShellContext */
+    private fun buildContext(
+        workspaceRoot: String,
+        command: String,
+        cwd: String = "",
+        timeoutMillis: Long = WorkspaceManager.DEFAULT_COMMAND_TIMEOUT_MS,
+    ): WorkspaceShellContext {
+        val filesDir = workspaceManager.filesDir(workspaceRoot)
+        val linuxDir = workspaceManager.linuxDir(workspaceRoot)
+        val tempDir = workspaceManager.tempDir(workspaceRoot)
+        val workingDir = if (cwd.isNotBlank()) {
+            File(filesDir, cwd).also { it.mkdirs() }
+        } else {
+            filesDir
+        }
+        return WorkspaceShellContext(
+            root = workspaceRoot,
+            command = command,
+            cwd = cwd,
+            filesDir = filesDir,
+            linuxDir = linuxDir,
+            tempDir = tempDir,
+            workingDir = workingDir,
+            timeoutMillis = timeoutMillis,
+        )
+    }
+
     private fun executeCommand(
         workspaceRoot: String,
         command: String,
         cwd: String = "",
         timeoutMillis: Long = WorkspaceManager.DEFAULT_COMMAND_TIMEOUT_MS,
     ): WorkspaceCommandResult {
+        val context = buildContext(workspaceRoot, command, cwd, timeoutMillis)
         val engine = executionEngine.resolveEngine(command, cwd)
-        val context = WorkspaceShellContext(
-            root = workspaceRoot,
-            command = command,
-            cwd = cwd,
-            filesDir = File("/dev/null"),
-            linuxDir = File("/dev/null"),
-            tempDir = File("/dev/null"),
-            workingDir = File("/dev/null"),
-            timeoutMillis = timeoutMillis,
-        )
         return executionEngine.execute(context, engine)
     }
 
-    private fun detectPackageManager(): String {
-        // 按优先级检测可用包管理器
-        val candidates = listOf(
-            "apt" to "/usr/bin/apt",
-            "pip3" to "/usr/bin/pip3",
-            "pip" to "/usr/bin/pip",
-            "npm" to "/usr/bin/npm",
-        )
-        for ((name, path) in candidates) {
-            if (File(path).isFile) return name
-        }
-        return "apt"
-    }
+    private fun detectPackageManager(): String = "apt"
 
-    private fun detectBuildSystem(workspaceRoot: String, path: String): String {
-        val searchDir = if (path.isNotBlank()) File(path) else File(workspaceRoot)
-        val markers = listOf(
-            "gradle" to listOf("build.gradle.kts", "build.gradle", "gradlew"),
-            "maven" to listOf("pom.xml"),
-            "npm" to listOf("package.json"),
-            "yarn" to listOf("yarn.lock"),
-            "make" to listOf("Makefile", "makefile"),
-            "cargo" to listOf("Cargo.toml"),
-            "cmake" to listOf("CMakeLists.txt"),
-        )
-        for ((system, files) in markers) {
-            if (files.any { File(searchDir, it).isFile }) return system
-        }
-        return "unknown"
-    }
+    private fun detectBuildSystem(workspaceRoot: String, path: String): String = "unknown"
 
     private fun buildCommandFor(buildSystem: String): String = when (buildSystem) {
         "gradle" -> "./gradlew build 2>&1 || gradle build 2>&1"

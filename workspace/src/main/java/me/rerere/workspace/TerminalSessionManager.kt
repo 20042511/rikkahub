@@ -232,7 +232,7 @@ class TerminalSessionManager {
         columns: Int,
     ): TerminalSession {
         val shell = guessShell()
-        val workDir = cwd ?: "/"
+        val workDir = cwd ?: "/workspace"
 
         val envList = mutableListOf(
             "TERM=xterm-256color",
@@ -280,7 +280,7 @@ class TerminalSessionManager {
         env: Map<String, String>,
     ): TerminalSession {
         val shell = guessShell()
-        val workDir = cwd?.let { File(it) } ?: File("/")
+        val workDir = cwd?.let { File(it) } ?: File("/workspace")
 
         val pb = ProcessBuilder(shell, "-l")
             .directory(if (workDir.isDirectory) workDir else File("/"))
