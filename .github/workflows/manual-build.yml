@@ -35,7 +35,7 @@ jobs:
             ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
       - name: Create google-services.json
-        run: echo '{"project_info":{"project_number":"000000000000","project_id":"rikkahub-debug","storage_bucket":"rikkahub-debug.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:0000000000000000","android_client_info":{"package_name":"me.rerere.rikkahub"}},"oauth_client":[],"api_key":[{"current_key":"dummy"}],"services":{"analytics_service":{"status":2},"appinvite_service":{"status":2},"ads_service":{"status":2}}}],"configuration_version":"1"}' > app/google-services.json
+        run: echo '{"project_info":{"project_number":"000000000000","project_id":"rikkahub-debug","storage_bucket":"rikkahub-debug.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:0000000000000000","android_client_info":{"package_name":"me.rerere.rikkahub"}},"oauth_client":[],"api_key":[{"current_key":"dummy"}],"services":{"analytics_service":{"status":2},"appinvite_service":{"status":2},"ads_service":{"status":2}}},{"client_info":{"mobilesdk_app_id":"1:000000000000:android:0000000000000001","android_client_info":{"package_name":"me.rerere.rikkahub.debug"}},"oauth_client":[],"api_key":[{"current_key":"dummy"}],"services":{"analytics_service":{"status":2},"appinvite_service":{"status":2},"ads_service":{"status":2}}}],"configuration_version":"1"}' > app/google-services.json
       - name: Build APK (debug)
         run: |
           chmod +x gradlew
