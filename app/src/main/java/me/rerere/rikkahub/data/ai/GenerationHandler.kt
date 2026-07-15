@@ -46,6 +46,7 @@ import me.rerere.rikkahub.data.datastore.findProvider
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantMemory
 import me.rerere.rikkahub.data.repository.MemoryRepository
+import me.rerere.rikkahub.utils.BugReporter
 import me.rerere.rikkahub.utils.applyPlaceholders
 import java.util.Locale
 import kotlin.time.Clock
@@ -293,6 +294,8 @@ class GenerationHandler(
                             // 取消必须向上传播，否则停止生成会被误报为工具执行错误
                             if (it is CancellationException) throw it
                             it.printStackTrace()
+                            // 记录到 BugReporter，让我看到真实错误
+                            BugReporter.onToolError(context, tool.toolName, tool.input, it)
                             executedTools += tool.copy(
                                 output = listOf(
                                     UIMessagePart.Text(

@@ -46,5 +46,8 @@ object CrashHandler {
                 putBoolean(KEY_CRASHED, true)
                 putString(KEY_STACKTRACE, stackTrace)
             } // commit() 同步写入，确保崩溃前写完
+
+        // 同步写入 BugReporter 持久日志（崩溃后进程即将退出，必须同步）
+        BugReporter.onCrash(context, thread, throwable)
     }
 }

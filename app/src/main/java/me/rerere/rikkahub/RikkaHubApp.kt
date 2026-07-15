@@ -33,6 +33,7 @@ import me.rerere.rikkahub.di.viewModelModule
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.service.WebServerService
+import me.rerere.rikkahub.utils.BugReporter
 import me.rerere.rikkahub.utils.CrashHandler
 import me.rerere.rikkahub.utils.DatabaseUtil
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
@@ -65,6 +66,8 @@ class RikkaHubApp : Application() {
 
         // install crash handler
         CrashHandler.install(this)
+        // init BugReporter（之后所有模块可用静态方法写日志）
+        BugReporter.init(this)
 
         // Init QuickJS native library
         QuickJSLoader.init()

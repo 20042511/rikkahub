@@ -10,6 +10,7 @@ import kotlinx.coroutines.withContext
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.db.dao.WorkspaceDAO
 import me.rerere.rikkahub.data.db.entity.WorkspaceEntity
+import me.rerere.rikkahub.utils.BugReporter
 import me.rerere.rikkahub.utils.JsonInstant
 import me.rerere.workspace.RootfsInstallProgress
 import me.rerere.workspace.RootfsInstaller
@@ -232,11 +233,15 @@ class WorkspaceRepository(
         stdin: ByteArray? = null,
     ): WorkspaceCommandResult {
         val workspace = dao.getById(id) ?: error("Workspace not found: $id")
-        // runInterruptible 让协程取消转化为线程中断，从而打断阻塞的 Process.waitFor 并杀掉进程
-        return runInterruptible(Dispatchers.IO) {
+        val result = runInterruptible(Dispatchers.IO) {
             manager.ensureWorkspace(workspace.root)
             manager.executeCommand(workspace.root, command, cwd, timeoutMillis, stdin)
         }
+        // 失败时记日志（exitCode≠0 或超时）
+        if (result.exitCode != 0 || result.timedOut) {
+            BugReporter.onCommandError(command, result.exitCode, result.stdout, result.stderr)
+        }
+        return result
     }
 
     suspend fun delete(id: String): Boolean {

@@ -56,6 +56,7 @@ import me.rerere.rikkahub.data.datastore.getCurrentAssistant
 import me.rerere.rikkahub.ui.hooks.writeStringPreference
 import me.rerere.rikkahub.ui.theme.RikkahubTheme
 import me.rerere.rikkahub.RouteActivity
+import me.rerere.rikkahub.utils.BugReporter
 import me.rerere.rikkahub.utils.CrashHandler
 import org.koin.android.ext.android.inject
 import kotlin.uuid.Uuid
@@ -119,24 +120,38 @@ class SafeModeActivity : ComponentActivity() {
                             Text(stringResource(R.string.safe_mode_enter_app))
                         }
 
+                        // ─── Bug Report 按钮（总是在 SafeMode 显示） ────────
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                val report = BugReporter.readReport()
+                                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                cm.setPrimaryClip(ClipData.newPlainText("RikkaHub Bug Report", report))
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("复制完整 Bug 报告")
+                        }
                         if (stackTrace != null) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.safe_mode_crash_report),
-                                    style = MaterialTheme.typography.titleSmall,
-                                )
-                                OutlinedButton(
-                                    onClick = {
-                                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                        cm.setPrimaryClip(ClipData.newPlainText("crash", stackTrace))
-                                    }
-                                ) {
-                                    Text(stringResource(R.string.safe_mode_copy))
+                            OutlinedButton(
+                                onClick = {
+                                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    cm.setPrimaryClip(ClipData.newPlainText("crash", stackTrace))
                                 }
+                            ) {
+                                Text(stringResource(R.string.safe_mode_copy))
                             }
+                        }
+                    }
+
+                    if (stackTrace != null) {
+                        Text(
+                            text = stringResource(R.string.safe_mode_crash_report),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
