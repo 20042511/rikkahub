@@ -41,6 +41,11 @@ jobs:
       - name: Build APK
         run: |
           chmod +x gradlew
+          # 用时间戳覆盖 versionCode，确保每次 debug APK 版本号递增
+          TS=$(date +%s)
+          echo "DEBUG: Setting versionCode to $TS"
+          sed -i "s/versionCode = [0-9]*/versionCode = $TS/" app/build.gradle.kts
+          grep "versionCode" app/build.gradle.kts | head -2
           ./gradlew assembleDebug
       - name: Rename APK
         run: |
