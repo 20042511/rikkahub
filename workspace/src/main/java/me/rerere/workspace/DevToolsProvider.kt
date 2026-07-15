@@ -199,7 +199,7 @@ class DevToolsProvider(
         manager: String? = null,
         cwd: String = "",
     ): PkgResult {
-        val pm = manager ?: detectPackageManager()
+        val pm = manager ?: "apt"
         val command = when (pm) {
             "apt" -> "apt-cache search $query"
             "pip", "pip3" -> "${pm} search $query"
