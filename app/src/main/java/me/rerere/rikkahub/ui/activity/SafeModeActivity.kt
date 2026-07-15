@@ -56,6 +56,7 @@ import me.rerere.rikkahub.data.datastore.getCurrentAssistant
 import me.rerere.rikkahub.ui.hooks.writeStringPreference
 import me.rerere.rikkahub.ui.theme.RikkahubTheme
 import me.rerere.rikkahub.RouteActivity
+import me.rerere.rikkahub.utils.BugReporter
 import me.rerere.rikkahub.utils.CrashHandler
 import org.koin.android.ext.android.inject
 import kotlin.uuid.Uuid
@@ -117,6 +118,23 @@ class SafeModeActivity : ComponentActivity() {
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(stringResource(R.string.safe_mode_enter_app))
+                        }
+
+                        // BugReporter: 一键复制完整日志给 AI
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    val report = BugReporter.readReport()
+                                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    cm.setPrimaryClip(ClipData.newPlainText("RikkaHub Bug Report", report))
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("复制 Bug 报告")
+                            }
                         }
 
                         if (stackTrace != null) {

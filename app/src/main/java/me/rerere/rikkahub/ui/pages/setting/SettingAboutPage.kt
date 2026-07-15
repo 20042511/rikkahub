@@ -4,6 +4,7 @@ import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Code
 import me.rerere.hugeicons.stroke.Earth
 import me.rerere.hugeicons.stroke.File02
+import me.rerere.hugeicons.stroke.Clipboard
 import me.rerere.hugeicons.stroke.Github
 import me.rerere.hugeicons.stroke.SmartPhone01
 import androidx.compose.foundation.clickable
@@ -47,8 +48,12 @@ import me.rerere.rikkahub.ui.components.easteregg.EmojiBurstHost
 import me.rerere.rikkahub.ui.components.ui.CardGroup
 import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.theme.CustomColors
+import me.rerere.rikkahub.utils.BugReporter
 import me.rerere.rikkahub.utils.openUrl
 import me.rerere.rikkahub.utils.plus
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 
 @Composable
 fun SettingAboutPage() {
@@ -173,6 +178,16 @@ fun SettingAboutPage() {
                             leadingContent = { Icon(HugeIcons.File02, null) },
                             supportingContent = { Text("https://github.com/rikkahub/rikkahub/blob/master/LICENSE") },
                             headlineContent = { Text(stringResource(R.string.about_page_license)) },
+                        )
+                        item(
+                            onClick = {
+                                val report = BugReporter.readReport()
+                                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                cm.setPrimaryClip(ClipData.newPlainText("RikkaHub Bug Report", report))
+                            },
+                            leadingContent = { Icon(HugeIcons.Clipboard, null) },
+                            supportingContent = { Text("复制全部错误日志粘贴给 AI") },
+                            headlineContent = { Text("导出 Bug 报告") },
                         )
                     }
                 }
