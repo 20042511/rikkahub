@@ -41,32 +41,13 @@ jobs:
       - name: Build APK
         run: |
           chmod +x gradlew
-          # 用时间戳覆盖 versionCode，确保每次 debug APK 版本号递增
           TS=$(date +%s)
           echo "DEBUG: Setting versionCode to $TS"
           sed -i "s/versionCode = [0-9]*/versionCode = $TS/" app/build.gradle.kts
-          grep "versionCode" app/build.gradle.kts | head -2
           ./gradlew assembleDebug
-      - name: Rename APK
-        run: |
-          cp app/build/outputs/apk/debug/*.apk app/build/outputs/apk/debug/rikkahub-workspace-v2-debug.apk
-      - name: Upload APK (artifact)
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: rikkahub-workspace-v2-debug
-          path: app/build/outputs/apk/debug/rikkahub-workspace-v2-debug.apk
-          if-no-files-found: error
-      - name: Publish nightly release
-        uses: softprops/action-gh-release@v2
-        if: success()
-        with:
-          tag_name: nightly
-          name: Nightly Build
-          prerelease: true
-          body: |
-            自动构建 $(date +'%Y-%m-%d %H:%M')
-            提交: ${{ github.sha }}
-
-            > ⚠️ 开发版本，可能不稳定，仅供测试。
-          files: app/build/outputs/apk/debug/rikkahub-workspace-v2-debug.apk
-          fail_on_unmatched_files: false
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
