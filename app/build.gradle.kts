@@ -83,11 +83,17 @@ android {
         }
         debug {
             applicationIdSuffix = ".debug"
-            // 每次 debug 构建使用时间戳作为版本号，确保新 APK 可覆盖旧 APK
-            versionCode = (System.currentTimeMillis() / 1000L).toInt()
-            versionName = android.defaultConfig.versionName + "-debug." + versionCode
             buildConfigField("String", "VERSION_NAME", "\"${android.defaultConfig.versionName}\"")
             buildConfigField("String", "VERSION_CODE", "\"${android.defaultConfig.versionCode}\"")
+        }
+    }
+
+    // Debug 构建自动使用时间戳作为版本号，确保新 APK 可覆盖旧 APK
+    applicationVariants.all {
+        if (buildType.name == "debug") {
+            val ts = System.currentTimeMillis() / 1000L
+            versionCode = ts.toInt()
+            versionName = "${defaultConfig.versionName}-debug"
         }
     }
     compileOptions {
