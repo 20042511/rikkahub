@@ -50,6 +50,11 @@ static int open_pty_master(char *slave_name, size_t slave_name_size) {
         close(master);
         return -1;
     }
+    // 设置为非阻塞模式，避免 read() 在有数据前卡死调用线程
+    int flags = fcntl(master, F_GETFL, 0);
+    if (flags >= 0) {
+        fcntl(master, F_SETFL, flags | O_NONBLOCK);
+    }
     return master;
 }
 

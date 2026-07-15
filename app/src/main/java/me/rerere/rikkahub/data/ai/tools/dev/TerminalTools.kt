@@ -123,7 +123,7 @@ fun createTerminalTools(
                         }.toString()
                     ))
 
-                // 写入命令
+                // 写入命令（带换行）
                 val written = terminalSessionManager.writeToSession(sessionId, "$command\n")
                 if (!written) {
                     return@Tool listOf(UIMessagePart.Text(
@@ -133,39 +133,32 @@ fun createTerminalTools(
                     ))
                 }
 
-                // 读取输出
+                // 等一会让命令产生输出，然后读取所有可用数据
+                kotlinx.coroutines.delay(500)
                 val outputBuilder = StringBuilder()
                 val startTime = System.currentTimeMillis()
                 val timeoutMs = timeout * 1000L
 
-                while (true) {
+                // 分3批读取，每次间隔300ms，确保完整捕获输出
+                for (batch in 1..3) {
+                    kotlinx.coroutines.delay(300)
                     val elapsed = System.currentTimeMillis() - startTime
                     if (elapsed > timeoutMs) {
                         outputBuilder.append("\n[Command timed out after ${timeout}s]")
                         break
                     }
-                    val data = terminalSessionManager.readFromSession(sessionId)
-                    if (data == null || data.isEmpty()) {
-                        Thread.sleep(50)
-                        continue
-                    }
-                    val text = data.toString(Charsets.UTF_8)
-                    outputBuilder.append(text)
-                    // 如果超过 128KB 截断
-                    if (outputBuilder.length > 128 * 1024) {
-                        outputBuilder.append("\n[Output truncated at 128KB]")
-                        break
-                    }
-                    // 检测命令结束（简单通过是否返回提示符判断）
-                    if (text.contains("$ ") || text.contains("# ")) {
-                        // 再给一点时间确保完整输出
-                        Thread.sleep(200)
-                        val extra = terminalSessionManager.readFromSession(sessionId)
-                        if (extra != null) {
-                            outputBuilder.append(extra.toString(Charsets.UTF_8))
+                    // 持续读取直到没有更多数据
+                    while (true) {
+                        val data = terminalSessionManager.readFromSession(sessionId)
+                        if (data == null || data.isEmpty()) break
+                        val text = data.toString(Charsets.UTF_8)
+                        outputBuilder.append(text)
+                        if (outputBuilder.length > 128 * 1024) {
+                            outputBuilder.append("\n[Output truncated at 128KB]")
+                            break
                         }
-                        break
                     }
+                    if (outputBuilder.length > 128 * 1024) break
                 }
 
                 listOf(UIMessagePart.Text(
