@@ -6,6 +6,7 @@ import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantLock
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -20,6 +21,8 @@ import kotlinx.coroutines.flow.flow
  *    使用标准 ProcessBuilder 创建管道式进程
  *
  * 自动检测并选择可用模式，对 API 使用者透明。
+ *
+ * ⚠️ 线程安全：每个会话有独立的读写锁，防止多个工具调用交叉读写同一会话。
  */
 class TerminalSessionManager {
 
@@ -27,6 +30,9 @@ class TerminalSessionManager {
     private val ptyAvailable: Boolean = TermuxJNI.isAvailable()
 
     private val sessions = ConcurrentHashMap<String, TerminalSession>()
+
+    /** 每个会话的读写锁，防止并行工具调用交叉读写同一会话 */
+    private val sessionLocks = ConcurrentHashMap<String, ReentrantLock>()
 
     init {
         Log.d(TAG, "TerminalSessionManager initialized, PTY available: $ptyAvailable")
@@ -54,36 +60,44 @@ class TerminalSessionManager {
     }
 
     /**
-     * 向会话写入命令
+     * 向会话写入命令（线程安全）
      */
     fun writeToSession(sessionId: String, input: String): Boolean {
         val session = sessions[sessionId] ?: return false
-        return try {
+        val lock = sessionLocks.getOrPut(sessionId) { ReentrantLock() }
+        lock.lock()
+        try {
             session.write(input.toByteArray(Charsets.UTF_8))
             session.lastActiveAt = System.currentTimeMillis()
-            true
+            return true
         } catch (e: Exception) {
             Log.e(TAG, "writeToSession failed: $sessionId", e)
             closeSession(sessionId)
-            false
+            return false
+        } finally {
+            lock.unlock()
         }
     }
 
     /**
-     * 从会话读取输出（非阻塞）
+     * 从会话读取输出（非阻塞，线程安全）
      */
     fun readFromSession(sessionId: String, maxBytes: Int = 4096): ByteArray? {
         val session = sessions[sessionId] ?: return null
-        return try {
+        val lock = sessionLocks.getOrPut(sessionId) { ReentrantLock() }
+        lock.lock()
+        try {
             val data = session.read(maxBytes)
             if (data != null) {
                 session.lastActiveAt = System.currentTimeMillis()
             }
-            data
+            return data
         } catch (e: Exception) {
             Log.e(TAG, "readFromSession failed: $sessionId", e)
             closeSession(sessionId)
-            null
+            return null
+        } finally {
+            lock.unlock()
         }
     }
 
