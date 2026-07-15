@@ -4,7 +4,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.util.Log
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -29,11 +28,10 @@ object BugReporter {
     private val json = Json { prettyPrint = false; ignoreUnknownKeys = true }
 
     /** 在 Application.onCreate 里调用一次，之后所有方法不再需要传 Context */
-    fun init(app: Context) {
-        if (_appContext == null) _appContext = app.applicationContext
+    fun initialize(app: Context) {
+        _appContext = app.applicationContext
     }
     private var _appContext: Context? = null
-    private fun appCtx(): Context = _appContext ?: error("BugReporter.init() 未调用")
 
     /** 不传 Context 的便捷方法（前提是已调用 init） */
     fun onCrash(thread: Thread, throwable: Throwable) {

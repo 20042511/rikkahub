@@ -67,7 +67,7 @@ class RikkaHubApp : Application() {
         // install crash handler
         CrashHandler.install(this)
         // init BugReporter（之后所有模块可用静态方法写日志）
-        BugReporter.init(this)
+        BugReporter.initialize(this)
 
         // Init QuickJS native library
         QuickJSLoader.init()
