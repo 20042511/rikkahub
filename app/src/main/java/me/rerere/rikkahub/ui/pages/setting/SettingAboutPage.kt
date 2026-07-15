@@ -5,7 +5,6 @@ import me.rerere.hugeicons.stroke.Code
 import me.rerere.hugeicons.stroke.Earth
 import me.rerere.hugeicons.stroke.File02
 import me.rerere.hugeicons.stroke.Github
-import me.rerere.hugeicons.stroke.Bug01
 import me.rerere.hugeicons.stroke.SmartPhone01
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -48,11 +47,8 @@ import me.rerere.rikkahub.ui.components.easteregg.EmojiBurstHost
 import me.rerere.rikkahub.ui.components.ui.CardGroup
 import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.theme.CustomColors
-import me.rerere.rikkahub.utils.BugReporter
 import me.rerere.rikkahub.utils.openUrl
 import me.rerere.rikkahub.utils.plus
-import android.content.ClipData
-import android.content.ClipboardManager
 
 @Composable
 fun SettingAboutPage() {
@@ -152,26 +148,6 @@ fun SettingAboutPage() {
                                 Text("${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} / Android ${android.os.Build.VERSION.RELEASE} / SDK ${android.os.Build.VERSION.SDK_INT}")
                             },
                             headlineContent = { Text(stringResource(R.string.about_page_system)) },
-                        )
-                    }
-                }
-
-                // ─── Bug 报告 ────────────────────
-                item {
-                    CardGroup(
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                    ) {
-                        item(
-                            onClick = {
-                                val report = BugReporter.readReport()
-                                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                cm.setPrimaryClip(ClipData.newPlainText("RikkaHub Bug Report", report))
-                            },
-                            leadingContent = { Icon(HugeIcons.Bug01, null) },
-                            supportingContent = {
-                                Text("复制全部错误日志并贴给 AI")
-                            },
-                            headlineContent = { Text("导出 Bug 报告") },
                         )
                     }
                 }
