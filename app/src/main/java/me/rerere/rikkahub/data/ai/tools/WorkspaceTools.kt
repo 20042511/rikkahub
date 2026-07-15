@@ -14,6 +14,7 @@ import me.rerere.ai.ui.toMetadata
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
 import me.rerere.rikkahub.utils.generateUnifiedDiff
+import me.rerere.workspace.EngineType
 import me.rerere.workspace.WorkspaceCommandResult
 import me.rerere.workspace.WorkspaceFileEntry
 import me.rerere.workspace.WorkspaceManager
@@ -286,10 +287,19 @@ private fun createSearchFilesTool(
     execute = {
         val params = it.jsonObject
         val query = params["query"]?.jsonPrimitive?.contentOrNull ?: error("query is required")
-        val path = params["path"]?.jsonPrimitive?.contentOrNull ?: ""
+        val rawPath = params["path"]?.jsonPrimitive?.contentOrNull ?: ""
         val regex = params["regex"]?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() ?: false
         val include = params["include"]?.jsonPrimitive?.contentOrNull
-        val results = workspaceRepository.grep(workspaceId, query, path, regex, includeGlob = include)
+
+        // 处理 /workspace 前缀 → 映射到 files 存储区
+        val (searchPath, searchRoot) = if (rawPath.startsWith("/workspace")) {
+            rawPath.removePrefix("/workspace").trimStart('/') to me.rerere.workspace.WorkspaceStorageArea.FILES
+        } else {
+            rawPath.trimStart('/') to me.rerere.workspace.WorkspaceStorageArea.FILES
+        }
+
+        // grep 使用 files 目录作为根，传入相对路径
+        val results = workspaceRepository.grep(workspaceId, query, searchPath, regex, includeGlob = include)
         val matches = results.take(MAX_SEARCH_RESULTS).map { match ->
             buildJsonObject {
                 put("path", match.path)
@@ -464,6 +474,8 @@ private suspend fun WorkspaceRepository.runRootfsCommand(
         command = command,
         timeoutMillis = WorkspaceManager.DEFAULT_COMMAND_TIMEOUT_MS,
         stdin = stdin,
+        // 这些命令（mkdir, cat, stat 等）只在 proot rootfs 内才有意义
+        forceEngine = EngineType.PROOT,
     )
     if (result.timedOut) {
         error("$action timed out")

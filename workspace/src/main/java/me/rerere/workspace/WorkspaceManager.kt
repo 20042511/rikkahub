@@ -147,6 +147,7 @@ class WorkspaceManager(
         cwd: String = "",
         timeoutMillis: Long = DEFAULT_COMMAND_TIMEOUT_MS,
         stdin: ByteArray? = null,
+        forceEngine: EngineType? = null,
     ): WorkspaceCommandResult {
         require(command.isNotBlank()) { "Command is required" }
         val workingDir = fileSystem.resolve(filesDir(root), cwd)
@@ -165,7 +166,10 @@ class WorkspaceManager(
             stdin = stdin,
         )
 
-        // 使用混合执行引擎自动路由
+        // forceEngine 不为 null 时跳过自动路由
+        if (forceEngine != null) {
+            return executionEngine.execute(context, forceEngine)
+        }
         return executionEngine.execute(context)
     }
 
