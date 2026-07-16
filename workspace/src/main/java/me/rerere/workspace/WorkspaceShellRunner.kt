@@ -23,7 +23,12 @@ data class WorkspaceShellContext(
 
 class HostShellRunner : WorkspaceShellRunner {
     override fun execute(context: WorkspaceShellContext): WorkspaceCommandResult {
-        val process = ProcessBuilder(defaultShell(), "-c", context.command)
+        // 把 AI 的 /workspace 路径翻译成真实的 files 目录
+        // （proot 版用 bind mount 实现，Host 版手动翻译）
+        val workspacePath = context.workingDir.absolutePath
+        val command = translateWorkspacePath(context.command, workspacePath)
+
+        val process = ProcessBuilder(defaultShell(), "-c", command)
             .directory(context.workingDir)
             .redirectErrorStream(false)
             .start()
@@ -32,6 +37,20 @@ class HostShellRunner : WorkspaceShellRunner {
 
     private fun defaultShell(): String =
         if (File("/system/bin/sh").exists()) "/system/bin/sh" else "/bin/sh"
+
+    companion object {
+        /** 把命令中的 /workspace 路径替换为真实的 workspace 目录 */
+        fun translateWorkspacePath(cmd: String, workspaceDir: String): String {
+            // 常见的 /workspace 引用模式：
+            //   ls /workspace           → ls /real/path
+            //   cat /workspace/file.txt → cat /real/path/file.txt
+            //   cd /workspace && ls     → cd /real/path && ls
+            //   echo /workspace/*       → echo /real/path/*
+            //   mkdir -p /workspace/x   → mkdir -p /real/path/x
+            return cmd.replace("/workspace/", "$workspaceDir/")
+                .replace(Regex("""(?<!/)/workspace(?!/|\w)"""), workspaceDir)
+        }
+    }
 }
 
 // 单个流保留的最大字符数, 防止命令疯狂输出导致 OOM 或撑爆 LLM 上下文

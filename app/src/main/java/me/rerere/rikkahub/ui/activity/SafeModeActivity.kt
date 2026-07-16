@@ -130,6 +130,14 @@ class SafeModeActivity : ComponentActivity() {
                                     val report = BugReporter.readReport()
                                     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                     cm.setPrimaryClip(ClipData.newPlainText("RikkaHub Bug Report", report))
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        if (report.startsWith("[BugReporter]"))
+                                            "尚无错误记录"
+                                        else
+                                            "已复制 ${report.lines().size} 行日志到剪贴板",
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
                                 },
                                 modifier = Modifier.weight(1f)
                             ) {
